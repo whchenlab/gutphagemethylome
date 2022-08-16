@@ -4,7 +4,7 @@
 
 ### Sequence files 
 
-> HGV.hq.genome.fa -- CHGV HQ viral genomes
+> CHGV.hq.genome.fa -- CHGV HQ viral genomes
 > 
 > CHGV.hq.faa -- predicted CHGV proteins
 > 
