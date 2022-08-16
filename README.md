@@ -12,7 +12,8 @@
 > 
 > UHGGv2.MTase.faa -- predicted UHGG MTases
 > 
-
+> pt2genome.csv -- protein id to genome name
+> 
 ### Processed methylome data
 > Modified_gff.rar -- basemod gff files generated from SMRTlink for the CHGV HQ viral genomes; one GFF file for each sample.
 
