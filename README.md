@@ -1,6 +1,6 @@
-## Raw data files
+## Data
 
-> Raw data files are deposited to [https://figshare.com/articles/dataset/Rawdata/20464083](https://figshare.com/articles/dataset/Rawdata/20464203)
+> Related data files are deposited to [https://figshare.com/articles/dataset/Rawdata/20464083](https://figshare.com/articles/dataset/Rawdata/20464203)
 
 ### Sequence files 
 
