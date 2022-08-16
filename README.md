@@ -13,9 +13,12 @@
 > UHGGv2.MTase.faa -- predicted UHGG MTases
 > 
 
-### other files
-> Modified_gff.rar -- basemod gff files generated from SMRTlink
+### Processed methylome data
+> Modified_gff.rar -- basemod gff files generated from SMRTlink for the CHGV HQ viral genomes; one GFF file for each sample.
 
+### Rdata files
+
+> various RData files required for the Rscripts below.
 
 ## Shell scripts
 ### 1. Batch_upload_to_SMRTlink.sh
