@@ -1,5 +1,15 @@
 ## Shell scripts
 > Rawdatas deposited in [https://figshare.com/articles/dataset/Rawdata/20464083](https://figshare.com/articles/dataset/Rawdata/20464203)
+
+> CHGV.hq.faa -- predicted CHGV proteins
+> 
+> CHGV.hq.MTase.faa -- predicted CHGV MTases
+> 
+> HGV.hq.genome.fa -- CHGV HQ viral genomes
+> 
+> UHGGv2.MTase.faa -- predicted UHGG MTases
+> 
+> Modified_gff.rar -- basemod gff files generated from SMRTlink
 ### 1. Batch_upload_to_SMRTlink.sh
 > upload xml files to SMRTlink websever with import-dataset API
 ### 2. Dealing_with_modified_gffs.sh
