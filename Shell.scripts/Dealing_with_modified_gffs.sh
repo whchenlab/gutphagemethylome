@@ -18,7 +18,7 @@ seqkit split -p 6 ./$type.rmdup.fa
 for i in `ls $type.rmdup.fa.split`
 do
   mkdir -p ./cat_${type}/$i
-  /mnt/raid8/sunchuqing/Softwares/meme-5.4.1/bin/meme-chip $type.rmdup.fa.split/$i \
+  ${Software}/meme-5.4.1/bin/meme-chip $type.rmdup.fa.split/$i \
   -meme-p 40 -dna -oc ./cat_${type}/$i  \
   -meme-mod zoops --meme-nmotifs 10000 -minw 3 -maxw 20 
   echo -e "motif_id\tmotif_alt_id\tsequence_name\tstart\tstop\tstrand\tscore\tp-value\tq-value\tmatched_sequence"> ./cat_${type}/$i/${type}.fimo.tsv
