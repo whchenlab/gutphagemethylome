@@ -2,13 +2,13 @@
 
 > Raw data files are deposited to [https://figshare.com/articles/dataset/Rawdata/20464083](https://figshare.com/articles/dataset/Rawdata/20464203)
 
-### Raw sequence files 
+### Sequence files 
 
+> HGV.hq.genome.fa -- CHGV HQ viral genomes
+> 
 > CHGV.hq.faa -- predicted CHGV proteins
 > 
 > CHGV.hq.MTase.faa -- predicted CHGV MTases
-> 
-> HGV.hq.genome.fa -- CHGV HQ viral genomes
 > 
 > UHGGv2.MTase.faa -- predicted UHGG MTases
 > 
