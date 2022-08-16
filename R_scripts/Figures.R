@@ -9,6 +9,9 @@ library(gg.gap)
 library(patchwork)
 library(reshape2)
 library(pROC)
+library(ggpubr)
+library(readr)
+
 
 #load data----
 load("Data/modified.anno.cds.RData")
@@ -19,13 +22,13 @@ load("Data/genome.anno.info.RData")
 load("Data/gene.stat.RData")
 load("Data/motif.filtered.RData")
 load("Data/genome.info.Rdata")
-load("Data/genome.gene.count.Rdata")
+load("Data/genome.gene.count.RDS")
 load("Data/GPD.meta.RData")
 load("Data/ases.blast.RData")
 load("Data/mvp.blast.RData")
 
-#Figure1C----
-t<-unique(modified.anno.cds.done[,c(1,3,4,10)])
+# 1. %modified bases----
+t<-unique(modified.anno.cds.done[,c(1,3,4,10)]) %>% subset(sequence_name%in%d.cov.5)
 modified.anno.cds.done.stat<-aggregate(t$motif_site,
                                        by=list(t$sequence_name,
                                                t$InCDS,
@@ -50,7 +53,7 @@ modified.anno.cds.done.stat %>%
   theme_bw()+
   scale_color_futurama()+
   geom_signif(comparisons = list(unique(modified.anno.cds.done.stat$Group)),step_increase = 0.1,
-              map_signif_level = T,test = t.test)+
+              map_signif_level = T,test = wilcox.test)+
   labs(y="%modified bases")+
   facet_wrap(~Modified_Type)+
   theme(strip.background.x = element_rect(fill = "white")) +
@@ -258,8 +261,6 @@ p00<-gg.gap(plot = p0,
             rel_heights = c(0.05, 0, 0.1),
             ylim = c(0, 700))
 p1<-motif.filtered.pt.agg%>% 
-  # mutate(Gene_type=factor(Gene_type,levels = c("MTase","REase"))) %>% 
-  # mutate(count=factor(count,levels = c("0","1","2","3","4",">=5"))) %>% 
   ggplot(aes(x=InCDS,y=count,fill=InCDS))+
   geom_boxplot(width=0.5)+
   scale_fill_brewer(palette = "GnBu")+
@@ -275,8 +276,6 @@ p1<-motif.filtered.pt.agg%>%
         axis.text.x = element_blank()) +
   labs(y="Nr. of Motif Type",color="InCDS")
 p2<-motif.filtered.pt.agg%>% 
-  # mutate(Gene_type=factor(Gene_type,levels = c("MTase","REase"))) %>% 
-  # mutate(count=factor(count,levels = c("0","1","2","3","4",">=5"))) %>% 
   ggplot(aes(x=InCDS,y=count,fill=InCDS))+
   geom_boxplot(width=0.5)+
   geom_signif(comparisons = list(unique(motif.filtered.pt.agg$InCDS)),step_increase = 0.05,
@@ -306,15 +305,16 @@ t.stat<-merge(t.stat,genome.stat,
 t.stat$Modified_Bases_pct<-0
 t.stat$Modified_Bases_pct[which(t.stat$Modified_Type=="m6A")] <- t.stat$Modified_Bases[which(t.stat$Modified_Type=="m6A")]/t.stat$AT[which(t.stat$Modified_Type=="m6A")]
 t.stat$Modified_Bases_pct[which(t.stat$Modified_Type=="m4C")] <- t.stat$Modified_Bases[which(t.stat$Modified_Type=="m4C")]/t.stat$GC[which(t.stat$Modified_Type=="m4C")]
+m<-data.frame(Genome=subset(genome.info,!names%in%subset(genome.gene.count,Gene_type=="MTase")$Genome)$names,
+              Gene_type="MTase",
+              count=0)
+
+genome.gene.count<-rbind(genome.gene.count,m)
 
 genome.info.count<-merge(genome.info,genome.gene.count,by.x="names",by.y="Genome",all.x=T)
 genome.info.count<-merge(genome.info.count,t.stat,by.x="names",by.y="sequence_name")
 
-genome.info.count$count[which(is.na(genome.info.count$count))]<-0
-r<-genome.info.count[which(is.na(genome.info.count$Gene_type)),]
-r$Gene_type<-"REase"
-genome.info.count$Gene_type[which(is.na(genome.info.count$Gene_type))]<-"MTase"
-genome.info.count<-rbind(genome.info.count,r)
+
 genome.info.count$count[which(genome.info.count$count>=5)]<-">=5"
 genome.info.count<-genome.info.count[,c("names","Gene_type","count","Modified_Type","Modified_Bases_pct")]
 genome.info.count<-dcast(genome.info.count,names+Modified_Type+Modified_Bases_pct~Gene_type,value.var = "count")
@@ -325,7 +325,7 @@ genome.info.count<-melt(genome.info.count,
                         value.name = "count")
 save(genome.info.count,file="../genome.info.count.Rdata")
 genome.info.count %>% 
-  mutate(Gene_type=factor(Gene_type,levels = c("MTase","REase"))) %>% 
+  mutate(Gene_type=factor(Gene_type,levels = c("MTase"))) %>% 
   mutate(count=factor(count,levels = c("0","1","2","3","4",">=5"))) %>% 
   ggplot(aes(x=count,y=Modified_Bases_pct,color=Modified_Type))+
   geom_boxplot(width=0.6)+
@@ -348,10 +348,7 @@ names(motif.filtered.count)<-c("Genome","Motif_Type","motif_count")
 genome.info.count<-merge(genome.info,genome.gene.count,by.x="names",by.y="Genome",all.x=T)
 genome.info.count$count[which(is.na(genome.info.count$count))]<-0
 
-r<-genome.info.count[which(is.na(genome.info.count$Gene_type)),]
-r$Gene_type<-"REase"
 genome.info.count$Gene_type[which(is.na(genome.info.count$Gene_type))]<-"MTase"
-genome.info.count<-rbind(genome.info.count,r)
 genome.info.count$count[which(genome.info.count$count>=5)]<-">=5"
 genome.info.count<-genome.info.count[,c("names","Gene_type","count")]
 genome.info.count<-dcast(genome.info.count,names~Gene_type,value.var = "count")
@@ -364,7 +361,6 @@ genome.info.count<-melt(genome.info.count,
 genome.info.count<-merge(genome.info.count,motif.filtered.count,by.x="names",by.y="Genome",all.x=T)
 genome.info.count$count[which(genome.info.count$count>=5)]<-">=5"
 genome.info.count %>% 
-  mutate(Gene_type=factor(Gene_type,levels = c("MTase","REase"))) %>% 
   mutate(count=factor(count,levels = c("0","1","2","3","4",">=5"))) %>% 
   ggplot(aes(x=count,y=motif_count,fill=Motif_Type))+
   geom_boxplot(width=0.6)+
@@ -391,23 +387,6 @@ mt<-genome.info %>%
   scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
   theme(axis.text.x = element_text(angle = 15,hjust = 1))
 
-chi.test.data<-aggregate(genome.info$REase,by=list(genome.info$Lifestyle,genome.info$REase),FUN=length)
-chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
-chisq.test(chi.test.data[,c(2,5)])
-chisq.test(chi.test.data[,c(2,3)])
-chisq.test(chi.test.data[,c(3,4)])
-chisq.test(chi.test.data[,c(4,5)])
-re<-genome.info %>% 
-  mutate(REase=factor(REase,levels = c("Y","N"))) %>% 
-  ggplot()+
-  geom_bar(aes(x=Lifestyle,y=..count..,fill=REase),position = "fill",width=0.7)+
-  scale_fill_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
-  theme_bw()+
-labs(y="",title = "REase")+
-  guides(fill="none")+
-  scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
-  theme(axis.text.x = element_text(angle = 15,hjust = 1))
-
 chi.test.data<-aggregate(genome.info$MTase,by=list(genome.info$Type,genome.info$MTase),FUN=length)
 chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
 chi.test.data[is.na(chi.test.data)]<-0
@@ -427,23 +406,7 @@ labs(y="Percentage",title = "MTase")+
   scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
   theme(axis.text.x = element_text(angle = 15,hjust = 1))
 
-chi.test.data<-aggregate(genome.info$REase,by=list(genome.info$Type,genome.info$REase),FUN=length)
-chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
-chisq.test(chi.test.data[,c("High-quality","crAssphage")])
-chisq.test(chi.test.data[,c("crAssphage","Gubaphage")])
-chisq.test(chi.test.data[,c("High-quality","Gubaphage")])
-re2<-genome.info %>% 
-  mutate(REase=factor(REase,levels = c("Y","N"))) %>% 
-  mutate(Type=factor(Type,levels = c("High-quality","crAssphage","Gubaphage"))) %>% 
-  ggplot()+
-  geom_bar(aes(x=Type,y=..count..,fill=REase),position = "fill",width=0.7)+
-  scale_fill_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
-  theme_bw()+
-  labs(y="",title = "REase")+
-  guides(fill="none")+
-  scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
-  theme(axis.text.x = element_text(angle = 15,hjust = 1))
-(mt+re)/(mt2+re2)
+
 #Figure2D----
 chi.test.data<-aggregate(GPD.meta$MTase,by=list(GPD.meta$Lifestyle,GPD.meta$MTase),FUN=length)
 chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
@@ -463,26 +426,7 @@ labs(y="Percentage",title = "GPD MTase")+
   scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
   theme(axis.text.x = element_text(angle = 15,hjust = 1))
 
-chi.test.data<-aggregate(GPD.meta$REase,by=list(GPD.meta$Lifestyle,GPD.meta$REase),FUN=length)
-chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
-chisq.test(chi.test.data[,c(2,5)])
-chisq.test(chi.test.data[,c(2,3)])
-chisq.test(chi.test.data[,c(3,4)])
-chisq.test(chi.test.data[,c(4,5)])
-re<-GPD.meta %>% 
-  subset(Anno=="High-quality") %>%
-  
-  mutate(REase=factor(REase,levels = c("Y","N"))) %>% 
-  ggplot()+
-  geom_bar(aes(x=Lifestyle,y=..count..,fill=REase),position = "fill",width=0.7)+
-  scale_fill_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
-  theme_bw()+
-
-labs(y="",title = "GPD REase")+
-  guides(fill="none")+
-  scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
-  theme(axis.text.x = element_text(angle = 15,hjust = 1))
-# mt+re
+# mt
 chi.test.data<-aggregate(GPD.meta$MTase,by=list(GPD.meta$Type,GPD.meta$MTase),FUN=length)
 chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
 chi.test.data[is.na(chi.test.data)]<-0
@@ -504,30 +448,102 @@ labs(y="Percentage",title = "GPD MTase")+
   scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
   theme(axis.text.x = element_text(angle = 15,hjust = 1))
 
-chi.test.data<-aggregate(GPD.meta$REase,by=list(GPD.meta$Type,GPD.meta$REase),FUN=length)
-chi.test.data<-dcast(chi.test.data,Group.2~Group.1)
-chisq.test(chi.test.data[,c("High-quality","crAssphage")])
-chisq.test(chi.test.data[,c("crAssphage","Gubaphage")])
-chisq.test(chi.test.data[,c("High-quality","Gubaphage")])
-re2<-GPD.meta %>% 
-  subset(Anno=="High-quality") %>%
-  
-  mutate(REase=factor(REase,levels = c("Y","N"))) %>% 
-  mutate(Type=factor(Type,levels = c("High-quality","crAssphage","Gubaphage"))) %>% 
-  ggplot()+
-  geom_bar(aes(x=Type,y=..count..,fill=REase),position = "fill",width=0.7)+
-  scale_fill_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
-  theme_bw()+
-labs(y="",title = "GPD REase")+
-  guides(fill="none")+
-  scale_y_continuous(labels = scales::percent,limits = c(0,1.10),breaks=seq(0,1,0.25))+
-  theme(axis.text.x = element_text(angle = 15,hjust = 1))
+#Figute2E----
+RPKM<-read_csv(file="Data/HGV.RPKM.csv",col_names = FALSE)
+colnames(RPKM)<-c("Sample","sequence_name","RPKM")
+kep.list<-read.table("Data/file.list.0818.keep",quote = "",header = F)
+RPKM<-subset(RPKM,Sample %in% kep.list$V1)
+RPKM<-subset(RPKM,sequence_name %in% genome.info$names)
+prevalence<-subset(RPKM,RPKM > 0.5)
+prevalence<-data.frame(table(subset(RPKM,RPKM>=0.5)[,"sequence_name"])/length(unique(RPKM$Sample)))
+colnames(prevalence)<-c("sequence_name","Prevalence")
 
-(mt+re)/(mt2+re2)
-#Figure3B----
-MTase.prophage.blast<-MTase.prophage.blast%>% group_by(pt1) %>% 
+RPKM.mean<-aggregate(RPKM$RPKM,by=list(RPKM$sequence_name),FUN=mean)
+colnames(RPKM.mean)<-c("sequence_name","RPKM")
+RPKM.mean.density<-merge(RPKM.mean,t.stat,by="sequence_name")
+RPKM.mean.density<-merge(RPKM.mean.density,lifestyle[,c(1,4)],by.x="sequence_name",by.y="X1")
+RPKM.mean.density %>% 
+  ggplot(aes(x=Modified_Bases_pct,y=RPKM))+
+  geom_point(aes(color=X4),alpha=0.7,size=1)+
+  geom_smooth(method="lm",color="black")+
+  scale_y_log10()+
+  scale_x_log10()+
+  scale_color_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
+  facet_grid(~X4)+
+  
+  stat_cor(method = "spearman")+
+  theme_bw()+
+  guides(color="none")+
+  labs(x="Methylation density",y="Mean RPKM",color="Lifestyle")+
+  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
+motif.filtered.count.t<-motif.filtered.count %>% subset
+colnames(motif.filtered.count.t)[1]<-"sequence_name"
+
+RPKM.mean.motif<-merge(RPKM.mean,motif.filtered.count.t,by="sequence_name")
+RPKM.mean.motif<-merge(RPKM.mean.motif,lifestyle[,c(1,4)],by.x="sequence_name",by.y="X1")
+RPKM.mean.motif %>% 
+  ggplot(aes(x=motif_count,y=RPKM))+
+  geom_point(aes(color=X4),alpha=0.7,size=1)+
+  geom_smooth(method="lm",color="black")+
+  scale_y_log10()+
+  scale_x_log10()+
+  # scale_color_aaas()+
+  scale_color_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
+  facet_grid(Motif_Type ~X4)+
+  # facet_grid( ~X4)+
+  stat_cor(method = "spearman")+
+  theme_bw()+
+  guides(color="none")+
+  
+  labs(x="Methylation motif",y="Mean RPKM",color="Lifestyle")+
+  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
+
+
+#methylation density and prev---
+prevalence.density<-merge(prevalence,t.stat.1,by="sequence_name")
+prevalence.density<-merge(prevalence.density,lifestyle[,c(1,4)],by.x="sequence_name",by.y="X1")
+p1<-prevalence.density %>% 
+  ggplot(aes(x=Modified_Bases_pct,y=Prevalence))+
+  geom_point(aes(color=X4),alpha=0.7,size=1)+
+  geom_smooth(method="lm",color="black")+
+  scale_y_log10()+
+  scale_x_log10()+
+  # scale_color_aaas()+
+  scale_color_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
+  # facet_grid(Modified_Type~X4)+
+  facet_grid( ~X4)+
+  stat_cor(method = "spearman")+
+  theme_bw()+
+  guides(color="none")+
+  labs(x="Methylation density",y="Mean RPKM",color="Lifestyle")+
+  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
+
+#motif count and prev---
+motif.filtered.count.t<-motif.filtered.count
+colnames(motif.filtered.count.t)[1]<-"sequence_name"
+
+prevalence.motif<-merge(prevalence,motif.filtered.count.t,by="sequence_name")
+prevalence.motif<-merge(prevalence.motif,lifestyle[,c(1,4)],by.x="sequence_name",by.y="X1")
+p2<-prevalence.motif %>% 
+  ggplot(aes(x=motif_count,y=Prevalence))+
+  geom_point(aes(color=X4),alpha=0.7,size=1)+
+  geom_smooth(method="lm",color="black")+
+  scale_y_log10()+
+  scale_x_log10()+
+  # scale_color_aaas()+
+  scale_color_manual(values = c("#3B4992","#89A2E5","#A76CA8","#DD5E5E"))+
+  facet_grid(Motif_Type ~X4)+
+  # facet_grid( ~X4)+
+  stat_cor(method = "spearman")+
+  theme_bw()+
+  guides(color="none")+
+  labs(x="Methylation motif",y="Mean RPKM",color="Lifestyle")+
+  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
+
+#Figure4B----
+MTase.prophage.blast<-subset(ases.blast,Group=="MTase")%>% group_by(pt1) %>% 
   filter(similarity==max(similarity)) %>% ungroup()
-total<-1281
+total<-4479
 o90<-subset(MTase.prophage.blast,similarity>=90)$pt1 %>% unique%>% length
 o70<-subset(MTase.prophage.blast,similarity>=70 & similarity<90)$pt1 %>% unique%>% length
 o50<-subset(MTase.prophage.blast,similarity>=50 & similarity<70)$pt1 %>% unique%>% length
@@ -536,21 +552,7 @@ simi2bac<-data.frame(over90=o90/total,
                      over70=o70/total,
                      over50=o50/total,
                      over30=o30/total,
-                     
                      group="MTase")
-
-RE.prophage.blast<-RE.prophage.blast%>% group_by(pt1) %>% 
-  filter(similarity==max(similarity)) %>% ungroup()
-total<-623
-o90<-subset(RE.prophage.blast,similarity>=90)$pt1 %>% unique%>% length
-o70<-subset(RE.prophage.blast,similarity>=70 & similarity<90)$pt1 %>% unique%>% length
-o50<-subset(RE.prophage.blast,similarity>=50 & similarity<70)$pt1 %>% unique%>% length
-o30<-subset(RE.prophage.blast,similarity>=30 & similarity<50)$pt1 %>% unique%>% length
-simi2bac<-rbind(simi2bac,data.frame(over90=o90/total,
-                                    over70=o70/total,
-                                    over50=o50/total,
-                                    over30=o30/total,
-                                    group="REase"))
 simi2bac$less30<-1-rowSums(simi2bac[,1:4])
 simi2bac<-melt(simi2bac)
 simi2bac$variable<-gsub("over90",">=90",simi2bac$variable)
@@ -579,52 +581,20 @@ p1<-subset(simi2bac,group=="MTase") %>%
   scale_fill_brewer(labels = myLabel) +
   theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
 
-
-simi2bac$variable<-factor(simi2bac$variable,levels=rev(c(">=90","70~90",
-                                                         "50~70","30~50","<30")))
-simi2bac = simi2bac[order(simi2bac$variable, decreasing = FALSE),]
-myLabel2 = as.vector(subset(simi2bac,group=="REase")$variable)   
-myLabel2 = paste(myLabel2, "(", round(subset(simi2bac,group=="REase")$value * 100, 2), "%)", sep = "")   
-p2<-subset(simi2bac,group=="REase") %>% 
-  mutate(variable=factor(variable,levels=rev(c(">=90","70~90",
-                                               "50~70","30~50","<30")))) %>% 
-  ggplot( aes(x = "", y = value, fill = variable)) +
-  geom_bar(stat = "identity", width = 1) +    
-  coord_polar(theta = "y") + 
-  labs(x = "", y = "", title = "") + 
-  
-  theme_bw()+
-  labs(y="",fill="Similarities to B-REase")+
-  theme(axis.text.x = element_blank()) +
-  theme(axis.ticks = element_blank()) + 
-  facet_grid(~"MVP V-REase")+ 
-  scale_fill_brewer(palette = "YlOrRd" ,labels = myLabel2) +
-  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
-p1/p2
-#Figure3C----
+#Figure4C----
 load("Data/mvp.blast.RData")
 #species--
 RE.prophage.blast$"WithHost"<-"N"
 RE.prophage.blast$"WithHost"[which(RE.prophage.blast$s1==RE.prophage.blast$s2 )]<-"Y"
 MTase.prophage.blast$"WithHost"<-"N"
 MTase.prophage.blast$"WithHost"[which(MTase.prophage.blast$s1==MTase.prophage.blast$s2 )]<-"Y"
-RE.prophage.blast$"Group"<-"REase"
 MTase.prophage.blast$"Group"<-"MTase"
-prophage.blast<-rbind(MTase.prophage.blast,RE.prophage.blast) %>% unique
+prophage.blast<-MTase.prophage.blast %>% unique
 multi<-(paste(prophage.blast$ge1,prophage.blast$s2,sep="__") %>% table %>% data.frame %>% subset(Freq>1))[1]
 colnames(multi)<-"l"
 prophage.blast.multi<- subset(prophage.blast,paste(ge1,s1,sep="__") %in% as.character(multi$l))
 # prophage.blast.multi<-prophage.blast.multi %>% group_by(pt1) %>%
 #   filter(similarity==max(similarity)) %>% ungroup()
-plot.roc(subset(prophage.blast.multi,Group=="REase" & Quality=="High" )$WithHost, 
-         subset(prophage.blast.multi,Group=="REase" & Quality=="High" )$similarity,
-         percent=TRUE, thresholds="best", # select the (best) threshold
-         print.thres="best",
-         ci=TRUE,
-         print.auc=TRUE, #display pAUC value on the plot with following options:
-         auc.polygon=TRUE, auc.polygon.col="#BF5454", # show pAUC as a polygon
-         max.auc.polygon=TRUE, max.auc.polygon.col="#BF545422", # also show the 100% polygon
-         main="REase ROC plot(species level)")
 plot.roc(subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$WithHost, 
          subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$similarity,
          percent=TRUE, thresholds="best", # select the (best) threshold
@@ -635,27 +605,16 @@ plot.roc(subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$WithHost
          max.auc.polygon=TRUE, max.auc.polygon.col="#1c61b622", # also show the 100% polygon
          main="MTase ROC plot(species level)")
 #Genus--
-RE.prophage.blast$"WithHost"<-"N"
-RE.prophage.blast$"WithHost"[which(RE.prophage.blast$s1==RE.prophage.blast$s2 |RE.prophage.blast$g1==RE.prophage.blast$g2)]<-"Y"
 MTase.prophage.blast$"WithHost"<-"N"
 MTase.prophage.blast$"WithHost"[which(MTase.prophage.blast$s1==MTase.prophage.blast$s2 |MTase.prophage.blast$g1==MTase.prophage.blast$g2)]<-"Y"
-RE.prophage.blast$"Group"<-"REase"
 MTase.prophage.blast$"Group"<-"MTase"
-prophage.blast<-rbind(MTase.prophage.blast,RE.prophage.blast) %>% unique
+prophage.blast<-MTase.prophage.blast %>% unique
 multi<-(paste(prophage.blast$ge1,prophage.blast$s2,sep="__") %>% table %>% data.frame %>% subset(Freq>1))[1]
 colnames(multi)<-"l"
 prophage.blast.multi<- subset(prophage.blast,paste(ge1,s1,sep="__") %in% as.character(multi$l))
 prophage.blast.multi<-prophage.blast.multi %>% group_by(pt1) %>% 
   filter(similarity==max(similarity)) %>% ungroup()
-plot.roc(subset(prophage.blast.multi,Group=="REase" & Quality=="High" )$WithHost, 
-         subset(prophage.blast.multi,Group=="REase" & Quality=="High" )$similarity,
-         percent=TRUE, thresholds="best", # select the (best) threshold
-         print.thres="best",
-         ci=TRUE,
-         print.auc=TRUE, #display pAUC value on the plot with following options:
-         auc.polygon=TRUE, auc.polygon.col="#BF5454", # show pAUC as a polygon
-         max.auc.polygon=TRUE, max.auc.polygon.col="#BF545422", # also show the 100% polygon
-         main="REase ROC plot(genus level)")
+
 plot.roc(subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$WithHost, 
          subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$similarity,
          percent=TRUE, thresholds="best", # select the (best) threshold
@@ -666,7 +625,7 @@ plot.roc(subset(prophage.blast.multi,Group=="MTase" & Quality=="High" )$WithHost
          max.auc.polygon=TRUE, max.auc.polygon.col="#1c61b622", # also show the 100% polygon
          main="MTase ROC plot(genus level)")
 
-#Figure3D----
+#Figure4D----
 RE.prophage.blast$"WithHost"<-"N"
 RE.prophage.blast$"WithHost"[which(RE.prophage.blast$s1==RE.prophage.blast$s2 )]<-"Y"
 MTase.prophage.blast$"WithHost"<-"N"
@@ -683,7 +642,7 @@ prophage.blast.multi<-prophage.blast.multi %>% group_by(pt1) %>%
 p1<-data.frame(WithHost=c("N","Y"),
                count=c((subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="N")$ge1 %>% unique %>% length),
                        (subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="Y")$ge1 %>% unique %>% length)),
-               GeneType=c("MTase/REase","MTase/REase")) %>% 
+               GeneType=c("MTase","MTase")) %>% 
   ggplot(aes(x=GeneType,y=count,fill=WithHost))+
   geom_bar(position="fill", stat = "identity",alpha=0.9,width = 0.5) +
   scale_y_continuous(labels = scales::percent)+
@@ -695,15 +654,12 @@ p1<-data.frame(WithHost=c("N","Y"),
 data.frame(WithHost=c("N","Y"),
            count=c((subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="N")$ge1 %>% unique %>% length),
                    (subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="Y")$ge1 %>% unique %>% length)),
-           GeneType=c("MTase/REase","MTase/REase"))
+           GeneType=c("MTase","MTase"))
 
-RE.prophage.blast$"WithHost"<-"N"
-RE.prophage.blast$"WithHost"[which(RE.prophage.blast$s1==RE.prophage.blast$s2 |RE.prophage.blast$g1==RE.prophage.blast$g2)]<-"Y"
 MTase.prophage.blast$"WithHost"<-"N"
 MTase.prophage.blast$"WithHost"[which(MTase.prophage.blast$s1==MTase.prophage.blast$s2 |MTase.prophage.blast$g1==MTase.prophage.blast$g2)]<-"Y"
-RE.prophage.blast$"Group"<-"REase"
 MTase.prophage.blast$"Group"<-"MTase"
-prophage.blast<-rbind(MTase.prophage.blast,RE.prophage.blast) %>% subset(similarity>=90) %>% unique
+prophage.blast<-MTase.prophage.blast %>% subset(similarity>=90) %>% unique
 multi<-(paste(prophage.blast$ge1,prophage.blast$s2,sep="__") %>% table %>% data.frame %>% subset(Freq>1))[1]
 colnames(multi)<-"l"
 prophage.blast.multi<- subset(prophage.blast,paste(ge1,s1,sep="__") %in% as.character(multi$l))
@@ -713,7 +669,7 @@ prophage.blast.multi<-prophage.blast.multi %>% group_by(pt1) %>%
 p2<-data.frame(WithHost=c("N","Y"),
                count=c((subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="N")$ge1 %>% unique %>% length),
                        (subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="Y")$ge1 %>% unique %>% length)),
-               GeneType=c("MTase/REase","MTase/REase")) %>% 
+               GeneType=c("MTase","MTase")) %>% 
   ggplot(aes(x=GeneType,y=count,fill=WithHost))+
   geom_bar(position="fill", stat = "identity",alpha=0.9,width = 0.5) +
   scale_y_continuous(labels = scales::percent)+
@@ -725,11 +681,11 @@ p2<-data.frame(WithHost=c("N","Y"),
 data.frame(WithHost=c("N","Y"),
            count=c((subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="N")$ge1 %>% unique %>% length),
                    (subset(prophage.blast.multi,Quality=="High" & similarity>=90 &WithHost=="Y")$ge1 %>% unique %>% length)),
-           GeneType=c("MTase/REase","MTase/REase"))
+           GeneType=c("MTase","MTase"))
 p1+p2+plot_layout(guides = "collect")
 
-#Figure3E----
-ases.blast.filtered<-ases.blast%>% subset(similarity>=90) %>% unique 
+#Figure4E----
+ases.blast.filtered<-ases.blast%>% subset(similarity>=90.Group=="MTase") %>% unique 
 multi<-(paste(ases.blast.filtered$g1,ases.blast.filtered$Species,sep="__") %>% table %>% data.frame %>% subset(Freq>1))[1]
 colnames(multi)<-"l"
 
@@ -740,15 +696,13 @@ ases.blast.filtered$"Type"[which(ases.blast.filtered$g1 %in%crass.list$V1 )]<-"c
 ases.blast.filtered$"Type"[which(ases.blast.filtered$g1 %in%guba.list$V1 )]<-"Gubaphage"
 num<-(ases.blast.filtered%>% select(g1) %>% unique)$g1 %>% length
 num1<-(ases.blast.filtered %>% subset(Group=="MTase" )%>% select(g1) %>% unique)$g1 %>% length
-num2<-(ases.blast.filtered %>% subset(Group=="REase" )%>% select(g1) %>% unique)$g1 %>% length
-num3<-subset(ases.blast.filtered,Group=="MTase" & g1 %in% subset(ases.blast.filtered,Group=="REase")$g1)$g1 %>% unique %>% length
 
-data=data.frame(variable=c("MTase","Both","REase","Not available"),
-                value=c(num1-num3,num3,num2-num3,9665-num))
+data=data.frame(variable=c("MTase","Not available"),
+                value=c(num1,9665-num1))
 myLabel = as.vector(data$variable)   
 myLabel = paste(myLabel, " (", round(data$value/sum(data$value) * 100, 2), "%)", sep = "")   
 data %>% 
-  mutate(variable=factor(variable,levels = c("MTase","Both","REase","Not available"))) %>% 
+  mutate(variable=factor(variable,levels = c("MTase","Not available"))) %>% 
   ggplot( aes(x = "", y = value, fill = variable)) +
   geom_bar(stat = "identity", width = 0.1,color="white",size=1.5) +    
   coord_polar(theta = "y") + 
@@ -762,7 +716,7 @@ data %>%
   theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))+
   theme(legend.text=element_text(size=14))
 
-#Figure3F----
+#Figure4F----
 #Host range MTases--
 color<-c("#648E8C","#A6BEB7","#EBE25B","#FF95A8FF","#FF6348FF","#CF5845","#A71F28") %>% rev()
 host2v<-subset(ases.blast.filtered,Group=="MTase")[,c("g1","Kingdom","Phylum","Class","Order","Family","Genus","Species")] 
@@ -792,61 +746,3 @@ p1<-HostRange %>%
   theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
   facet_grid(~Level)+
   theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))
-#Host range REases--
-
-host2v<-subset(ases.blast.filtered,Group=="REase")[,c("g1","Kingdom","Phylum","Class","Order","Family","Genus","Species")] 
-colnames(host2v)[1]<-"Virus"
-host2v.LCA<-calculate_LCA(host2v)
-HostRange<-table(host2v.LCA$level) %>% data.frame()
-HostRange$"Level"<-"REase"
-names(HostRange)<-c("Range","Count","Level")
-myLabel = as.vector(HostRange$Range)   
-myLabel = paste(myLabel, "(", round(HostRange$Count/ sum(HostRange$Count) * 100, 2), "%)", sep = "")   
-HostRange$"label"<-myLabel
-HostRange<-HostRange %>%
-  mutate(Range=factor(Range,levels = c("Kingdom","Phylum","Class","Order",
-                                       "Family","Genus","Species"))) 
-mylable<-arrange(HostRange,Range)$label
-HostRange<-HostRange %>%
-  mutate(label=factor(label,levels=mylable))
-p2<-HostRange %>%
-  ggplot(aes(x=1,y = Count, fill = label)) + 
-  geom_bar(stat = "identity", width = 1) +    
-  coord_polar(theta = "y") + 
-  labs(x = "", y = "", title = "",fill="Host Range") + 
-  theme(axis.ticks = element_blank()) + 
-  theme_bw()+
-  scale_fill_brewer(palette = "RdYlBu")+
-  theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
-  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))+
-  facet_grid(~Level)
-#Host range All--
-host2v<-ases.blast.filtered[,c("g1","Kingdom","Phylum","Class","Order","Family","Genus","Species")] 
-colnames(host2v)[1]<-"Virus"
-host2v.LCA<-calculate_LCA(host2v)
-HostRange<-table(host2v.LCA$level) %>% data.frame()
-HostRange$"Level"<-"Combined"
-names(HostRange)<-c("Range","Count","Level")
-myLabel = as.vector(HostRange$Range)   
-myLabel = paste(myLabel, "(", round(HostRange$Count/ sum(HostRange$Count) * 100, 2), "%)", sep = "")   
-HostRange$"label"<-myLabel
-HostRange<-HostRange %>%
-  mutate(Range=factor(Range,levels = c("Kingdom","Phylum","Class","Order",
-                                       "Family","Genus","Species"))) 
-mylable<-arrange(HostRange,Range)$label
-HostRange<-HostRange %>%
-  mutate(label=factor(label,levels=mylable))
-p3<-HostRange %>%
-  ggplot(aes(x=1,y = Count, fill = label)) + 
-  geom_bar(stat = "identity", width = 1) +    
-  coord_polar(theta = "y") + 
-  labs(x = "", y = "", title = "",fill="Host Range") + 
-  theme(axis.ticks = element_blank()) + 
-  theme_bw()+
-  scale_fill_brewer(palette = "RdYlBu")+
-
-  theme(strip.background.x = element_rect(fill = "white"),strip.background.y = element_rect(fill = "white"))+
-  theme(axis.text.x = element_blank(),axis.text.y = element_blank())+
-  facet_grid(~Level)
-#Host range plot--
-p1/p2/p3
