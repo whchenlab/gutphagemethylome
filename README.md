@@ -1,4 +1,3 @@
-# Gut Phage Methylome
 ## Shell scripts
 > Rawdatas deposited in [https://figshare.com/articles/dataset/Rawdata/20464083](https://figshare.com/articles/dataset/Rawdata/20464203)
 ### 1. Batch_upload_to_SMRTlink.sh
